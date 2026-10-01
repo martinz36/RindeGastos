@@ -3,6 +3,7 @@
 import React, { useState, FormEvent, ChangeEvent } from "react";
 import { createExpense } from "@/app/actions/worker-actions";
 import { uploadToCloudinaryServerAction } from "@/app/actions/expense-actions";
+import { compressImageClient } from "@/lib/image-utils";
 import { ExpenseType } from "@prisma/client";
 import { 
   Receipt, 
@@ -55,12 +56,21 @@ export default function ExpenseForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setReceiptUrl("");
+      setErrorMessage(null);
+
+      // Comprimir de inmediato en el navegador para evitar error 413/500 en Vercel por fotos de cámara pesadas
+      try {
+        const compressed = await compressImageClient(file, 1280, 1280, 0.75);
+        setPreviewUrl(compressed);
+        setReceiptUrl(compressed); // Guardamos la versión optimizada (~100KB)
+      } catch (err) {
+        console.warn("Fallo compresión client-side, usando object URL:", err);
+        setPreviewUrl(URL.createObjectURL(file));
+      }
     }
   };
 
@@ -101,18 +111,33 @@ export default function ExpenseForm({
     try {
       let finalReceiptUrl = receiptUrl;
 
-      // Subir archivo a Cloudinary / Servidor si se adjuntó uno nuevo
-      if (selectedFile && !finalReceiptUrl) {
+      // Si Cloudinary está configurado en el cliente, intentamos subida directa al CDN
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+      if (selectedFile && cloudName && cloudName !== "demo" && uploadPreset) {
         setIsUploading(true);
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        const uploadRes = await uploadToCloudinaryServerAction(formData);
-        if (uploadRes.success && uploadRes.secure_url) {
-          finalReceiptUrl = uploadRes.secure_url;
-        } else {
-          console.warn("No se pudo subir a Cloudinary, guardando con referencia local.");
+        try {
+          const formData = new FormData();
+          formData.append("file", finalReceiptUrl || selectedFile);
+          formData.append("upload_preset", uploadPreset);
+
+          const cRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (cRes.ok) {
+            const cData = await cRes.json();
+            if (cData.secure_url) {
+              finalReceiptUrl = cData.secure_url;
+            }
+          }
+        } catch (cErr) {
+          console.warn("Direct upload a Cloudinary falló, guardando comprobante optimizado.", cErr);
+        } finally {
+          setIsUploading(false);
         }
-        setIsUploading(false);
       }
 
       const res = await createExpense({
@@ -120,7 +145,7 @@ export default function ExpenseForm({
         tipo,
         concepto: concepto.trim(),
         monto: numMonto,
-        fecha: new Date(fecha),
+        fecha: fecha,
         origen: tipo === "MOVILIDAD" ? origen.trim() : undefined,
         destino: tipo === "MOVILIDAD" ? destino.trim() : undefined,
         motivo: tipo === "MOVILIDAD" ? motivo.trim() : undefined,

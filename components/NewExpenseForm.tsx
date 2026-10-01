@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
 import { createExpenseAction, getUsersAction, uploadToCloudinaryServerAction } from "@/app/actions/expense-actions";
+import { compressImageClient } from "@/lib/image-utils";
 import { ExpenseType } from "@prisma/client";
 
 interface UserOption {
@@ -49,7 +50,7 @@ export default function NewExpenseForm() {
     loadUsers();
   }, []);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
@@ -57,8 +58,14 @@ export default function NewExpenseForm() {
         return;
       }
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
       setErrorMessage(null);
+
+      try {
+        const compressed = await compressImageClient(file, 1280, 1280, 0.75);
+        setPreviewUrl(compressed);
+      } catch (err) {
+        setPreviewUrl(URL.createObjectURL(file));
+      }
     }
   };
 

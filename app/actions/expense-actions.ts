@@ -4,6 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { ExpenseStatus, ExpenseType, Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
+function safeRevalidate(paths: string[]) {
+  try {
+    for (const p of paths) {
+      revalidatePath(p);
+    }
+  } catch (err) {
+    console.warn("Revalidate error ignored in server action:", err);
+  }
+}
+
 export interface CreateExpenseInput {
   user_id: string;
   monto: number;
@@ -49,9 +59,7 @@ export async function createExpenseAction(data: CreateExpenseInput) {
       },
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/reportes");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
     return { success: true, expense };
   } catch (error: any) {
@@ -131,9 +139,7 @@ export async function approveExpenseAction(expenseId: string) {
       }
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/reportes");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
     return { success: true, expense: result };
   } catch (error: any) {
@@ -157,9 +163,7 @@ export async function rejectExpenseAction(expenseId: string, motivoRechazo?: str
       },
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/reportes");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
     return { success: true, expense: updatedExpense };
   } catch (error: any) {
     console.error("Error al rechazar gasto:", error);
@@ -182,9 +186,7 @@ export async function markExpenseAsPaidAction(expenseId: string) {
       },
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/reportes");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
     return { success: true, expense: updatedExpense };
   } catch (error: any) {
     console.error("Error al marcar como pagado:", error);
@@ -240,9 +242,7 @@ export async function addPettyCashDepositAction(userId: string, monto: number, d
       return { pettyCash, deposit };
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/reportes");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
     return { success: true, ...result };
   } catch (error: any) {
@@ -290,8 +290,7 @@ export async function createWorkerAction(nombre: string, email: string, rol: Rol
       },
     });
 
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard/worker");
+    safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
     return { success: true, user };
   } catch (error: any) {
     console.error("Error al crear trabajador:", error);

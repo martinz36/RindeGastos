@@ -135,9 +135,13 @@ export async function createExpense(data: CreateExpenseInput) {
       },
     });
 
-    revalidatePath("/dashboard/worker");
-    revalidatePath("/gastos");
-    revalidatePath("/reportes");
+    try {
+      revalidatePath("/dashboard/worker");
+      revalidatePath("/gastos");
+      revalidatePath("/reportes");
+    } catch (revalErr) {
+      console.warn("Advertencia de revalidación en cache:", revalErr);
+    }
 
     return { success: true, expense };
   } catch (error: any) {
