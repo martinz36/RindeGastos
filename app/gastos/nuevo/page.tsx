@@ -1,21 +1,36 @@
 import React from "react";
 import NewExpenseForm from "@/components/NewExpenseForm";
+import Navbar from "@/components/Navbar";
+import { getUsersAction } from "@/app/actions/expense-actions";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
-export default function NuevoGastoPage() {
+export const revalidate = 0;
+
+export default async function NuevoGastoPage() {
+  const { users } = await getUsersAction();
+
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Navbar
+        users={users.map((u) => ({
+          id: u.id,
+          nombre: u.nombre,
+          email: u.email,
+          rol: u.rol,
+          saldo: u.pettyCash ? Number(u.pettyCash.saldo_actual) : 0,
+        }))}
+      />
+
+      <div className="flex-1 max-w-4xl w-full mx-auto py-8 px-4">
         {/* Navigation Breadcrumb */}
         <div className="mb-6 flex items-center justify-between">
           <Link
             href="/gastos"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Volver a la Lista de Gastos
+            <ArrowLeft className="w-4 h-4" />
+            <span>Volver a la Lista de Gastos</span>
           </Link>
         </div>
 

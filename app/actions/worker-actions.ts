@@ -5,23 +5,63 @@ import { ExpenseStatus, ExpenseType, Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 export interface CreateExpenseInput {
+  userId?: string;
   concepto: string;
   monto: number;
   tipo: ExpenseType;
+  fecha?: string | Date;
+  origen?: string;
+  destino?: string;
+  motivo?: string;
+  comprobanteTipo?: string;
+  comprobanteNumero?: string;
+  receipt_url?: string;
 }
 
 /**
- * Obtiene el usuario por defecto para pruebas mientras no hay autenticación.
+ * Obtiene el usuario trabajador activo o el primero disponible
  */
-async function getDefaultWorkerUser() {
+export async function getActiveWorkerUser(userId?: string) {
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        pettyCash: {
+          include: {
+            deposits: {
+              orderBy: { fecha: "desc" },
+            },
+          },
+        },
+      },
+    });
+    if (user) return user;
+  }
+
   let user = await prisma.user.findFirst({
     where: { rol: Role.WORKER },
-    include: { pettyCash: true },
+    include: {
+      pettyCash: {
+        include: {
+          deposits: {
+            orderBy: { fecha: "desc" },
+          },
+        },
+      },
+    },
   });
 
   if (!user) {
     user = await prisma.user.findFirst({
-      include: { pettyCash: true },
+      include: {
+        pettyCash: {
+          include: {
+            deposits: {
+              orderBy: { fecha: "desc" },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -34,10 +74,24 @@ async function getDefaultWorkerUser() {
         pettyCash: {
           create: {
             saldo_actual: 500.00,
+            deposits: {
+              create: {
+                monto: 500.00,
+                descripcion: "Fondo Fijo Inicial Asignado",
+              },
+            },
           },
         },
       },
-      include: { pettyCash: true },
+      include: {
+        pettyCash: {
+          include: {
+            deposits: {
+              orderBy: { fecha: "desc" },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -45,32 +99,45 @@ async function getDefaultWorkerUser() {
 }
 
 /**
- * Server Action para crear un gasto (Trabajador)
+ * Server Action para crear un gasto por parte del Trabajador
  */
 export async function createExpense(data: CreateExpenseInput) {
   try {
     if (!data.concepto || data.concepto.trim() === "") {
-      throw new Error("El concepto es obligatorio.");
+      throw new Error("El concepto o descripción es obligatorio.");
     }
     if (!data.monto || isNaN(Number(data.monto)) || Number(data.monto) <= 0) {
       throw new Error("El monto debe ser un número mayor a 0.");
     }
 
-    const defaultUser = await getDefaultWorkerUser();
+    if (data.tipo === ExpenseType.MOVILIDAD) {
+      if (!data.origen?.trim()) throw new Error("Debes indicar el punto de Origen para la movilidad.");
+      if (!data.destino?.trim()) throw new Error("Debes indicar el punto de Destino para la movilidad.");
+      if (!data.motivo?.trim()) throw new Error("Debes indicar el motivo o razón del traslado.");
+    }
+
+    const workerUser = await getActiveWorkerUser(data.userId);
 
     const expense = await prisma.expense.create({
       data: {
-        user_id: defaultUser.id,
+        user_id: workerUser.id,
         concepto: data.concepto.trim(),
         monto: Number(data.monto),
         tipo: data.tipo,
         estado: ExpenseStatus.PENDIENTE,
-        receipt_url: "pendiente_de_imagen",
+        fecha: data.fecha ? new Date(data.fecha) : new Date(),
+        origen: data.origen?.trim() || null,
+        destino: data.destino?.trim() || null,
+        motivo: data.motivo?.trim() || null,
+        comprobanteTipo: data.comprobanteTipo || (data.tipo === ExpenseType.MOVILIDAD ? "DECLARACION_JURADA" : "BOLETA"),
+        comprobanteNumero: data.comprobanteNumero?.trim() || null,
+        receipt_url: data.receipt_url || null,
       },
     });
 
     revalidatePath("/dashboard/worker");
     revalidatePath("/gastos");
+    revalidatePath("/reportes");
 
     return { success: true, expense };
   } catch (error: any) {
@@ -80,20 +147,34 @@ export async function createExpense(data: CreateExpenseInput) {
 }
 
 /**
- * Obtiene los gastos del usuario trabajador actual
+ * Obtiene los gastos del usuario trabajador actual con historial de depósitos y todos los detalles
  */
-export async function getWorkerExpenses() {
+export async function getWorkerExpenses(userId?: string) {
   try {
-    const user = await getDefaultWorkerUser();
+    const user = await getActiveWorkerUser(userId);
 
-    const expenses = await prisma.expense.findMany({
-      where: { user_id: user.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const [expenses, allWorkers] = await Promise.all([
+      prisma.expense.findMany({
+        where: { user_id: user.id },
+        orderBy: { fecha: "desc" },
+      }),
+      prisma.user.findMany({
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+          rol: true,
+          pettyCash: {
+            select: { saldo_actual: true },
+          },
+        },
+        orderBy: { nombre: "asc" },
+      }),
+    ]);
 
-    return { success: true, user, expenses };
+    return { success: true, user, expenses, allWorkers };
   } catch (error: any) {
     console.error("Error en getWorkerExpenses:", error);
-    return { success: false, user: null, expenses: [], error: error.message };
+    return { success: false, user: null, expenses: [], allWorkers: [], error: error.message };
   }
 }

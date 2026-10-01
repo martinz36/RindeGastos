@@ -1,19 +1,19 @@
 import React from "react";
 import { getExpensesAction, getUsersAction } from "@/app/actions/expense-actions";
-import AdminGastosClient from "./AdminGastosClient";
+import ReportesClient from "./ReportesClient";
 import Navbar from "@/components/Navbar";
 
-export const revalidate = 0; // Dynamic server page
+export const revalidate = 0; // Dynamic server component
 
-interface GastosListPageProps {
+interface ReportesPageProps {
   searchParams?: Promise<{ userId?: string }>;
 }
 
-export default async function GastosListPage({ searchParams }: GastosListPageProps) {
+export default async function ReportesPage({ searchParams }: ReportesPageProps) {
   const resolvedParams = searchParams ? await searchParams : {};
   const currentUserId = resolvedParams.userId;
 
-  const { expenses, error } = await getExpensesAction();
+  const { expenses } = await getExpensesAction();
   const { users } = await getUsersAction();
 
   const activeUser = users.find((u) => u.id === currentUserId) || users.find((u) => u.rol === "ADMIN") || users[0];
@@ -32,14 +32,8 @@ export default async function GastosListPage({ searchParams }: GastosListPagePro
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto py-8 px-4 sm:px-6">
-        {error && (
-          <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <AdminGastosClient
-          initialExpenses={expenses || []}
+        <ReportesClient
+          expenses={expenses || []}
           users={users || []}
         />
       </main>
