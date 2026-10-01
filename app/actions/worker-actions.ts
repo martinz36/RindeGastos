@@ -142,8 +142,18 @@ export async function createExpense(data: CreateExpenseInput) {
     } catch (revalErr) {
       console.warn("Advertencia de revalidación en cache:", revalErr);
     }
-
-    return { success: true, expense };
+    return {
+      success: true,
+      expense: {
+        id: expense.id,
+        user_id: expense.user_id,
+        concepto: expense.concepto,
+        monto: Number(expense.monto),
+        tipo: expense.tipo,
+        estado: expense.estado,
+        fecha: expense.fecha.toISOString(),
+      },
+    };
   } catch (error: any) {
     console.error("Error en createExpense:", error);
     return { success: false, error: error.message || "Error al registrar el gasto." };

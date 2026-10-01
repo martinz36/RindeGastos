@@ -61,7 +61,18 @@ export async function createExpenseAction(data: CreateExpenseInput) {
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
-    return { success: true, expense };
+    return {
+      success: true,
+      expense: {
+        id: expense.id,
+        user_id: expense.user_id,
+        concepto: expense.concepto,
+        monto: Number(expense.monto),
+        tipo: expense.tipo,
+        estado: expense.estado,
+        fecha: expense.fecha.toISOString(),
+      },
+    };
   } catch (error: any) {
     console.error("Error al crear gasto:", error);
     return { success: false, error: error.message || "Error al registrar el gasto." };
@@ -141,7 +152,14 @@ export async function approveExpenseAction(expenseId: string) {
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
-    return { success: true, expense: result };
+    return {
+      success: true,
+      expense: {
+        id: result.id,
+        estado: result.estado,
+        pagado: result.pagado,
+      },
+    };
   } catch (error: any) {
     console.error("Error al aprobar gasto:", error);
     return { success: false, error: error.message || "Error al aprobar el gasto." };
@@ -164,7 +182,14 @@ export async function rejectExpenseAction(expenseId: string, motivoRechazo?: str
     });
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
-    return { success: true, expense: updatedExpense };
+
+    return {
+      success: true,
+      expense: {
+        id: updatedExpense.id,
+        estado: updatedExpense.estado,
+      },
+    };
   } catch (error: any) {
     console.error("Error al rechazar gasto:", error);
     return { success: false, error: error.message || "Error al rechazar el gasto." };
@@ -187,7 +212,14 @@ export async function markExpenseAsPaidAction(expenseId: string) {
     });
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
-    return { success: true, expense: updatedExpense };
+
+    return {
+      success: true,
+      expense: {
+        id: updatedExpense.id,
+        pagado: updatedExpense.pagado,
+      },
+    };
   } catch (error: any) {
     console.error("Error al marcar como pagado:", error);
     return { success: false, error: error.message || "Error al procesar el pago." };
@@ -244,7 +276,12 @@ export async function addPettyCashDepositAction(userId: string, monto: number, d
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
 
-    return { success: true, ...result };
+    return {
+      success: true,
+      pettyCashId: result.pettyCash.id,
+      saldo_actual: Number(result.pettyCash.saldo_actual),
+      depositId: result.deposit.id,
+    };
   } catch (error: any) {
     console.error("Error al registrar depósito de caja chica:", error);
     return { success: false, error: error.message || "No se pudo abonar a la caja chica." };
@@ -291,7 +328,16 @@ export async function createWorkerAction(nombre: string, email: string, rol: Rol
     });
 
     safeRevalidate(["/gastos", "/dashboard/worker", "/reportes"]);
-    return { success: true, user };
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+      },
+    };
   } catch (error: any) {
     console.error("Error al crear trabajador:", error);
     return { success: false, error: error.message || "Error al crear el usuario." };
